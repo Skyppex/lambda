@@ -1,0 +1,27 @@
+$true = Lx.Ly.x;
+$false = Lx.Ly.y;
+$i = Lx.x;
+$0 = Lf.Lx.x;
+$1 = Lf.Lx.f x;
+$2 = Lf.Lx.f (f x);
+$3 = Lf.Lx.f (f (f x));
+$4 = Lf.Lx.f (f (f (f x)));
+$5 = Lf.Lx.f (f (f (f (f x))));
+$6 = Lf.Lx.f (f (f (f (f (f x)))));
+
+$++ = Ln.Lf.Lx.f (n f x);
+$+ = Lm.Ln.m $++ n;
+$pred = Ln.Lf.Lx.n (Lg.Lh.h (g f)) (Lu.x) (Lu.u);
+$- = Lm.Ln.n $pred m;
+$* = Lm.Ln.m ($+ n) $0;
+
+$& = Lp.Lq.p q p;
+$| = Lp.Lq.p p q;
+$! = Lp.p $false $true;
+
+$is_zero = Ln.n (Lx.$false) $true;
+$leq = Lm.Ln.$is_zero ($- m n);
+$eq = Lm.Ln.($& ($leq m n) ($leq n m));
+$geq = Lm.Ln.$| ($eq m n) ($! ($leq m n));
+
+$geq $1 $1
