@@ -105,6 +105,7 @@ fn tokenize(code: String) -> Vec<Token> {
                 chars.remove(0);
                 tokens.push(Token::Semi);
             }
+            '#' => while chars.remove(0) != '\n' {},
             other => {
                 if other.is_whitespace() {
                     push_ident(&mut tokens, &mut current_ident);

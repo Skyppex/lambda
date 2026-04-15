@@ -1,5 +1,6 @@
 $true = Lx.Ly.x;
 $false = Lx.Ly.y;
+
 $i = Lx.x;
 $0 = Lf.Lx.x;
 $1 = Lf.Lx.f x;
@@ -24,4 +25,4 @@ $leq = Lm.Ln.$is_zero ($- m n);
 $eq = Lm.Ln.($& ($leq m n) ($leq n m));
 $geq = Lm.Ln.$| ($eq m n) ($! ($leq m n));
 
-$geq $1 $1
+$* $4 $4
