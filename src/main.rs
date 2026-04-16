@@ -1,9 +1,11 @@
 use std::{
+    cell::RefCell,
     collections::{HashMap, VecDeque},
     fmt::Display,
     fs::File,
     io::Read,
     path::PathBuf,
+    rc::Rc,
 };
 
 use clap::Parser;
@@ -22,20 +24,20 @@ fn main() -> std::io::Result<()> {
         file.read_to_string(&mut buf)?;
         run(buf, None)
     } else {
-        let mut interactive_scope = Scope::new();
+        let interactive_scope = Rc::new(RefCell::new(Scope::new()));
 
         loop {
             let mut buf = String::new();
             std::io::stdin().read_line(&mut buf)?;
 
-            run(buf, Some(&mut interactive_scope))
+            run(buf, Some(interactive_scope.clone()))
         }
     };
 
     Ok(())
 }
 
-fn run(source: String, scope: Option<&mut Scope>) {
+fn run(source: String, scope: Option<Rc<RefCell<Scope>>>) {
     let tokens = tokenize(source);
     let ast = parse(tokens);
     let result = eval(ast, scope);
@@ -55,7 +57,7 @@ enum Token {
 }
 
 fn tokenize(code: String) -> Vec<Token> {
-    let mut chars = code.chars().collect::<Vec<_>>();
+    let mut chars = code.chars().collect::<VecDeque<_>>();
     let mut tokens = vec![];
     let mut current_ident: Option<String> = None;
 
@@ -67,54 +69,54 @@ fn tokenize(code: String) -> Vec<Token> {
     };
 
     while !chars.is_empty() {
-        let next = chars.first().unwrap();
+        let next = chars.front().unwrap();
 
         match next {
             'L' => {
                 push_ident(&mut tokens, &mut current_ident);
-                chars.remove(0);
+                chars.pop_front();
                 tokens.push(Token::Lambda);
             }
             '.' => {
                 push_ident(&mut tokens, &mut current_ident);
-                chars.remove(0);
+                chars.pop_front();
                 tokens.push(Token::Dot);
             }
             '$' => {
                 push_ident(&mut tokens, &mut current_ident);
-                chars.remove(0);
+                chars.pop_front();
                 tokens.push(Token::Dollar);
             }
             '=' => {
                 push_ident(&mut tokens, &mut current_ident);
-                chars.remove(0);
+                chars.pop_front();
                 tokens.push(Token::Equal);
             }
             '(' => {
                 push_ident(&mut tokens, &mut current_ident);
-                chars.remove(0);
+                chars.pop_front();
                 tokens.push(Token::Open);
             }
             ')' => {
                 push_ident(&mut tokens, &mut current_ident);
-                chars.remove(0);
+                chars.pop_front();
                 tokens.push(Token::Close);
             }
             ';' => {
                 push_ident(&mut tokens, &mut current_ident);
-                chars.remove(0);
+                chars.pop_front();
                 tokens.push(Token::Semi);
             }
-            '#' => while chars.remove(0) != '\n' {},
+            '#' => while let Some('\n') = chars.pop_front() {},
             other => {
                 if other.is_whitespace() {
                     push_ident(&mut tokens, &mut current_ident);
-                    chars.remove(0);
+                    chars.pop_front();
                     continue;
                 }
 
                 current_ident = Some(current_ident.unwrap_or("".to_string()) + &other.to_string());
-                chars.remove(0);
+                chars.pop_front();
             }
         }
     }
@@ -283,7 +285,7 @@ enum Value {
     Function {
         param: String,
         body: Expr,
-        scope: Scope,
+        scope: Rc<RefCell<Scope>>,
     },
     UnresolvedApplication {
         left: Box<Value>,
@@ -339,32 +341,31 @@ impl Scope {
     }
 }
 
-fn eval(ast: Vec<Expr>, scope: Option<&mut Scope>) -> Value {
-    let mut root_scope = Scope::new();
-    let root_scope = scope.unwrap_or(&mut root_scope);
+fn eval(ast: Vec<Expr>, scope: Option<Rc<RefCell<Scope>>>) -> Value {
+    let root_scope = scope.unwrap_or(Rc::new(RefCell::new(Scope::new())));
 
     let mut ast = VecDeque::from(ast);
     let mut value = Value::Nothing;
 
     while !ast.is_empty() {
-        value = eval_expr(ast.pop_front().unwrap(), root_scope);
+        value = eval_expr(ast.pop_front().unwrap(), root_scope.clone());
     }
 
     value
 }
 
-fn eval_expr(expr: Expr, scope: &mut Scope) -> Value {
+fn eval_expr(expr: Expr, scope: Rc<RefCell<Scope>>) -> Value {
     match expr {
         Expr::Assignment { ident, assignment } => {
-            scope.add_var(ident, *assignment);
+            scope.borrow_mut().add_var(ident, *assignment);
             Value::Nothing
         }
         Expr::Variable(ident) => {
-            let expr = scope.substitute_var(&ident);
+            let expr = scope.borrow().substitute_var(&ident);
             eval_expr(expr, scope)
         }
         Expr::Application { left, right } => {
-            let left = eval_expr(*left, scope);
+            let left = eval_expr(*left, scope.clone());
             let right = eval_expr(*right, scope);
 
             let Value::Function {
@@ -379,18 +380,18 @@ fn eval_expr(expr: Expr, scope: &mut Scope) -> Value {
                 };
             };
 
-            let mut function_scope = inner_scope.child();
-            function_scope.add_sub(param, right);
+            let function_scope = Rc::new(RefCell::new(inner_scope.borrow().child()));
+            function_scope.borrow_mut().add_sub(param, right);
 
-            eval_expr(body, &mut function_scope)
+            eval_expr(body, function_scope)
         }
         Expr::Function { param, body } => Value::Function {
             param,
             body: *body,
-            scope: scope.clone(),
+            scope,
         },
         Expr::Identifier(ident) => {
-            let Some(value) = scope.substitute(&ident) else {
+            let Some(value) = scope.borrow().substitute(&ident) else {
                 return Value::Name(ident);
             };
 
@@ -405,7 +406,7 @@ impl Display for Value {
             Value::Nothing => write!(f, ""),
             Value::Name(ident) => write!(f, "{ident}"),
             Value::Function { param, body, scope } => {
-                let body = eval_expr(body.clone(), &mut scope.clone());
+                let body = eval_expr(body.clone(), scope.clone());
                 write!(f, "λ{param}.{body}")
             }
             Value::UnresolvedApplication { left, right } => {
