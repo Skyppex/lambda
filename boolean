@@ -1,0 +1,4 @@
+$& = Lp.Lq.p q p;
+$| = Lp.Lq.p p q;
+$~ = Lp.p $false $true;
+

@@ -22,7 +22,8 @@ fn main() -> std::io::Result<()> {
         let mut file = File::open(path)?;
         let mut buf = String::new();
         file.read_to_string(&mut buf)?;
-        run(buf, None)
+        let result = run(buf, None);
+        println!("{result}");
     } else {
         let interactive_scope = Rc::new(RefCell::new(Scope::new()));
 
@@ -30,18 +31,18 @@ fn main() -> std::io::Result<()> {
             let mut buf = String::new();
             std::io::stdin().read_line(&mut buf)?;
 
-            run(buf, Some(interactive_scope.clone()))
+            let result = run(buf, Some(interactive_scope.clone()));
+            println!("{result}");
         }
     };
 
     Ok(())
 }
 
-fn run(source: String, scope: Option<Rc<RefCell<Scope>>>) {
+fn run(source: String, scope: Option<Rc<RefCell<Scope>>>) -> Value {
     let tokens = tokenize(source);
-    let ast = parse(tokens);
-    let result = eval(ast, scope);
-    println!("{result}");
+    let ast = parse_program(tokens);
+    eval(ast, scope)
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -53,6 +54,7 @@ enum Token {
     Open,
     Close,
     Semi,
+    Bang,
     Ident(String),
 }
 
@@ -107,7 +109,12 @@ fn tokenize(code: String) -> Vec<Token> {
                 chars.pop_front();
                 tokens.push(Token::Semi);
             }
-            '#' => while let Some('\n') = chars.pop_front() {},
+            '!' => {
+                push_ident(&mut tokens, &mut current_ident);
+                chars.pop_front();
+                tokens.push(Token::Bang);
+            }
+            '#' => while !matches!(chars.pop_front(), Some('\n')) {},
             other => {
                 if other.is_whitespace() {
                     push_ident(&mut tokens, &mut current_ident);
@@ -141,17 +148,52 @@ enum Expr {
         body: Box<Expr>,
     },
     Identifier(String),
+    Source(Box<Expr>),
 }
 
-fn parse(tokens: Vec<Token>) -> Vec<Expr> {
+fn parse_program(tokens: Vec<Token>) -> Vec<Expr> {
     let mut queue = VecDeque::from(tokens);
     let mut exprs = vec![];
 
     while !queue.is_empty() {
-        exprs.push(parse_assignment(&mut queue));
+        exprs.push(parse(&mut queue));
     }
 
     exprs
+}
+
+fn parse(tokens: &mut VecDeque<Token>) -> Expr {
+    parse_source(tokens)
+}
+
+fn parse_source(tokens: &mut VecDeque<Token>) -> Expr {
+    let Token::Bang = tokens.front().unwrap() else {
+        return parse_assignment(tokens);
+    };
+
+    tokens.pop_front();
+
+    let next = tokens.pop_front().unwrap();
+
+    let Token::Ident(ident) = next else {
+        panic!("expected ident after !, found: {next:?}")
+    };
+
+    let source = match ident.as_str() {
+        "source" => {
+            let expr = parse_assignment(tokens);
+            Expr::Source(Box::new(expr))
+        }
+        _ => unreachable!(),
+    };
+
+    let next = tokens.pop_front();
+
+    let Some(Token::Semi) = next else {
+        panic!("expected ; after sourcing file, found {next:?}");
+    };
+
+    source
 }
 
 fn parse_assignment(tokens: &mut VecDeque<Token>) -> Expr {
@@ -173,21 +215,17 @@ fn parse_assignment(tokens: &mut VecDeque<Token>) -> Expr {
     let next = tokens.pop_front().unwrap();
 
     let Token::Ident(ident) = next else {
-        panic!("expected ident after $, found: {:?}", next);
+        panic!("expected ident after $, found: {next:?}");
     };
 
-    let next = tokens.pop_front().unwrap();
-
-    let Token::Equal = next else {
-        return Expr::Variable(ident);
-    };
+    tokens.pop_front().unwrap();
 
     let expr = parse_application(tokens);
 
     let next = tokens.front();
 
     let Some(Token::Semi) = next else {
-        panic!("expected ; after assignment, found: {:?}", next);
+        panic!("expected ; after assignment, found: {next:?}");
     };
 
     tokens.pop_front();
@@ -202,9 +240,9 @@ fn parse_application(tokens: &mut VecDeque<Token>) -> Expr {
     let mut left = parse_variable(tokens);
 
     while tokens.front().is_some() {
-        let next = tokens.front();
+        let next = tokens.front().unwrap();
 
-        if matches!(next, None | Some(Token::Close) | Some(Token::Semi)) {
+        if matches!(next, Token::Close | Token::Semi) {
             return left;
         }
 
@@ -228,7 +266,7 @@ fn parse_variable(tokens: &mut VecDeque<Token>) -> Expr {
     let next = tokens.pop_front().unwrap();
 
     let Token::Ident(ident) = next else {
-        panic!("expected ident after $, found: {:?}", next);
+        panic!("expected ident after $, found: {next:?}");
     };
 
     Expr::Variable(ident)
@@ -249,7 +287,7 @@ fn parse_function(tokens: &mut VecDeque<Token>) -> Expr {
     let next = tokens.pop_front().unwrap();
 
     let Token::Dot = next else {
-        panic!("expected . after L, found {:?}", next);
+        panic!("expected . after L, found {next:?}");
     };
 
     let body = parse_application(tokens);
@@ -265,16 +303,16 @@ fn parse_primary(tokens: &mut VecDeque<Token>) -> Expr {
 
     match next {
         Token::Open => {
-            let expr = parse_application(tokens);
+            let expr = parse(tokens);
             let next = tokens.pop_front().unwrap();
             let Token::Close = next else {
-                panic!("expected closing paren, found: {:?}", next);
+                panic!("expected closing paren, found: {next:?}");
             };
 
             expr
         }
         Token::Ident(ident) => Expr::Identifier(ident.clone()),
-        _ => panic!("expected ident, found: {:?}", next),
+        _ => panic!("expected ident, found: {next:?}"),
     }
 }
 
@@ -397,6 +435,22 @@ fn eval_expr(expr: Expr, scope: Rc<RefCell<Scope>>) -> Value {
 
             value
         }
+        Expr::Source(expr) => {
+            let value = eval_expr(*expr, scope.clone());
+
+            let Value::Name(file_name) = value else {
+                panic!("can't source {value}")
+            };
+
+            let mut buf = String::new();
+
+            File::open(&file_name)
+                .unwrap_or_else(|_| panic!("failed to open file: {file_name}"))
+                .read_to_string(&mut buf)
+                .unwrap_or_else(|_| panic!("failed to read file: {file_name}"));
+
+            run(buf, Some(scope))
+        }
     }
 }
 
@@ -431,6 +485,9 @@ impl Display for Expr {
             }
             Expr::Identifier(ident) => {
                 write!(f, "{ident}")
+            }
+            Expr::Source(expr) => {
+                write!(f, "!source {expr}")
             }
         }
     }

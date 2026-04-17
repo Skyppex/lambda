@@ -1,0 +1,5 @@
+$++ = Ln.Lf.Lx.f (n f x);
+$+ = Lm.Ln.m $++ n;
+$pred = Ln.Lf.Lx.n (Lg.Lh.h (g f)) (Lu.x) (Lu.u);
+$- = Lm.Ln.n $pred m;
+$* = Lm.Ln.m ($+ n) $0;

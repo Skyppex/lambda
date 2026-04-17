@@ -1,0 +1,5 @@
+$is_zero = Ln.n (Lx.$false) $true;
+$leq = Lm.Ln.$is_zero ($- m n);
+$eq = Lm.Ln.($& ($leq m n) ($leq n m));
+$geq = Lm.Ln.$| ($eq m n) ($~ ($leq m n));
+
