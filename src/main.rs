@@ -19,7 +19,7 @@ fn main() -> std::io::Result<()> {
     let cli = Cli::parse();
 
     if let Some(path) = cli.file {
-        let mut file = File::open(path)?;
+        let mut file = File::open(format!("{}.lambda", path.to_string_lossy()))?;
         let mut buf = String::new();
         file.read_to_string(&mut buf)?;
         let result = run(buf, None);
@@ -444,7 +444,7 @@ fn eval_expr(expr: Expr, scope: Rc<RefCell<Scope>>) -> Value {
 
             let mut buf = String::new();
 
-            File::open(&file_name)
+            File::open(format!("{file_name}.lambda"))
                 .unwrap_or_else(|_| panic!("failed to open file: {file_name}"))
                 .read_to_string(&mut buf)
                 .unwrap_or_else(|_| panic!("failed to read file: {file_name}"));

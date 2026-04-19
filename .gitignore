@@ -1,1 +1,54 @@
 /target
+
+### tree-sitter
+
+# Rust artifacts
+tree-sitter-lambda/target/
+tree-sitter-lambda/Cargo.lock
+
+# Node artifacts
+tree-sitter-lambda/build/
+tree-sitter-lambda/prebuilds/
+tree-sitter-lambda/node_modules/
+tree-sitter-lambda/package-lock.json
+
+# Swift artifacts
+tree-sitter-lambda/.build/
+tree-sitter-lambda/Package.resolved
+
+# Go artifacts
+tree-sitter-lambda/_obj/
+
+# Python artifacts
+tree-sitter-lambda/.venv/
+tree-sitter-lambda/dist/
+tree-sitter-lambda/*.egg-info
+tree-sitter-lambda/*.whl
+
+# C artifacts
+tree-sitter-lambda/*.a
+tree-sitter-lambda/*.so
+tree-sitter-lambda/*.so.*
+tree-sitter-lambda/*.dylib
+tree-sitter-lambda/*.dll
+tree-sitter-lambda/*.pc
+tree-sitter-lambda/*.exp
+tree-sitter-lambda/*.lib
+
+# Zig artifacts
+tree-sitter-lambda/.zig-cache/
+tree-sitter-lambda/zig-cache/
+tree-sitter-lambda/zig-out/
+
+# Example dirs
+tree-sitter-lambda//examples/*/
+
+# Grammar volatiles
+tree-sitter-lambda/*.wasm
+tree-sitter-lambda/*.obj
+tree-sitter-lambda/*.o
+
+# Archives
+tree-sitter-lambda/*.tar.gz
+tree-sitter-lambda/*.tgz
+tree-sitter-lambda/*.zip
