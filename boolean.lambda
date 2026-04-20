@@ -1,4 +1,6 @@
 $& = Lp.Lq.p q p;
 $| = Lp.Lq.p p q;
 $~ = Lp.p $false $true;
-
+$^ = Lp.Lq.p ($~ q) q;
+$beq = Lp.Lq.p q ($~ q);
+$if = Lc.Lt.Le.c t e;
