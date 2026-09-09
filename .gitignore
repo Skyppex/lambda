@@ -52,3 +52,11 @@ tree-sitter-lambda/*.o
 tree-sitter-lambda/*.tar.gz
 tree-sitter-lambda/*.tgz
 tree-sitter-lambda/*.zip
+
+# Devenv
+.devenv*
+devenv.local.nix
+devenv.local.yaml
+
+# pre-commit
+.pre-commit-config.yaml
